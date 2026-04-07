@@ -7,6 +7,7 @@ Adds higher-speed SFP modules beyond the vanilla game cap of 40 Gbps.
 | Module | Speed |
 |--------|-------|
 | QSFP28 100Gbps | 100 Gbps |
+| QSFP56 200Gbps | 200 Gbps |
 
 ## Features
 
