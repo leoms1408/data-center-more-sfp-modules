@@ -35,7 +35,7 @@ namespace MoreSFPModules
     {
         internal static readonly ModuleDefinition[] All =
         {
-                        new ModuleDefinition
+            new ModuleDefinition
             {
                 DisplayName     = "QSFP28 100Gbps",
                 SpeedGbps       = 100f,
