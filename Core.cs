@@ -5,7 +5,7 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 
-[assembly: MelonInfo(typeof(MoreSFPModules.Core), "More SFP Modules", "1.0.0", "leoms1408")]
+[assembly: MelonInfo(typeof(MoreSFPModules.Core), "More SFP Modules", "1.0.2", "leoms1408")]
 [assembly: MelonGame("Waseku", "Data Center")]
 
 namespace MoreSFPModules
