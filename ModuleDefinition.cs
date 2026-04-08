@@ -52,6 +52,24 @@ namespace MoreSFPModules
                 XpToUnlock      = 0,
                 ShopGuid        = "more_sfp_qsfp56_200g_v1",
             },
+//Below this is the part i added, its the only part i am responsible for - Default
+            new ModuleDefinition
+            {
+                DisplayName     = "QSFP-DD 400Gbps",
+                SpeedGbps       = 400f,
+                PriceMultiplier = 6.5f,
+                XpToUnlock      = 0,
+                ShopGuid        = "more_sfp_qsfpdd_400g_v1",
+            },
+            new ModuleDefinition
+            {
+                DisplayName     = "QSFP-DD 800Gbps",
+                SpeedGbps       = 800f,
+                PriceMultiplier = 9f,
+                XpToUnlock      = 0,
+                ShopGuid        = "more_sfp_qsfpdd_800g_v1",
+            },
+            },
         };
     }
 }
