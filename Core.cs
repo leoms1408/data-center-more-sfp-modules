@@ -1,7 +1,9 @@
 using Il2Cpp;
+using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using MelonLoader;
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 [assembly: MelonInfo(typeof(MoreSFPModules.Core), "More SFP Modules", "1.0.0", "leoms1408")]
 [assembly: MelonGame("Waseku", "Data Center")]
@@ -24,6 +26,10 @@ namespace MoreSFPModules
         // activeInHierarchy = false, so the game's UsableObject tracker ignores them.
         // Object.Instantiate still produces active clones from inactive-hierarchy objects.
         internal static GameObject TemplateHolder { get; private set; }
+
+        // Tracks pending 32x bulk box orders: key = custom prefabID (100+), value = count.
+        // Populated by PatchButtonCheckOut, consumed by DeliveryScannerRoutine.
+        internal static readonly Dictionary<int, int> PendingBulkOrders = new();
 
         // -----------------------------------------------------------------------
         // Scans vanilla sfpPrefabs to find the highest-speed module (QSFP+ 40G),
@@ -116,10 +122,6 @@ namespace MoreSFPModules
 
                 // Store a template at sfpPrefabs[id] so LoadSFPsFromSave (which does
                 // direct array access) can find the prefab during save loading.
-                // Instantiated directly under TemplateHolder so it is never active
-                // in hierarchy — the world tracker ignores it.
-                // PatchLoadSFPsFromSave refreshes this slot before each load to guard
-                // against Il2Cpp GC invalidating the cached pointer over time.
                 var template = BuildModulePrefab(mgm, id, entry, TemplateHolder.transform);
                 if (template != null)
                     template.name = $"SFPModule_template_{id}";
@@ -282,13 +284,29 @@ namespace MoreSFPModules
                 itemHeight = sourceRt.rect.height;
 
             int addedCount = 0;
-            int defIndex   = 0;
-            foreach (var (prefabID, _) in ModuleRegistry.Entries)
+            int basePrice  = sourceItem.shopItemSO.price;
+
+            for (int i = 0; i < ModuleList.All.Length; i++)
             {
-                if (defIndex >= ModuleList.All.Length) break;
-                var def = ModuleList.All[defIndex++];
-                var added = AddShopButton(sourceItem, shopParent, prefabID, def, sourceItem.shopItemSO.price);
-                if (added != null) addedCount++;
+                var def      = ModuleList.All[i];
+                int prefabID = 100 + i;
+                if (!ModuleRegistry.TryGet(prefabID, out _)) continue;
+
+                // 5x shop button (standard)
+                string label5 = $"5x {def.DisplayName}";
+                int price5    = (int)(basePrice * def.PriceMultiplier);
+                var added5    = AddShopButton(sourceItem, shopParent, prefabID,
+                                              label5, price5, def.XpToUnlock, def.ShopGuid);
+                if (added5 != null) addedCount++;
+
+                // 32x shop button — uses the SAME prefabID as 5x so the game
+                // delivers a normal box; PatchButtonCheckOut upgrades it post-delivery.
+                string label32 = $"32x {def.DisplayName}";
+                int price32    = (int)(basePrice * def.PriceMultiplier * 32f / 5f);
+                var added32    = AddShopButton(sourceItem, shopParent, prefabID,
+                                               label32, price32, def.XpToUnlock,
+                                               def.ShopGuid + "_32x");
+                if (added32 != null) addedCount++;
             }
 
             // The HL Mods container has a fixed height — extend it so the ScrollRect
@@ -310,36 +328,143 @@ namespace MoreSFPModules
         // Returns the created GameObject, or null if the ShopItem component is missing.
         // -----------------------------------------------------------------------
         private static GameObject AddShopButton(ShopItem source, GameObject parent, int prefabID,
-                                               ModuleDefinition def, int basePrice)
+                                               string label, int price, int xpToUnlock, string guid)
         {
             var newSO = ScriptableObject.CreateInstance<ShopItemSO>();
-            newSO.itemName   = $"5x {def.DisplayName}";
-            newSO.price      = (int)(basePrice * def.PriceMultiplier);
-            newSO.xpToUnlock = def.XpToUnlock;
+            newSO.itemName   = label;
+            newSO.price      = price;
+            newSO.xpToUnlock = xpToUnlock;
             newSO.itemType   = source.shopItemSO.itemType; // SFPBox (9)
             newSO.itemID     = prefabID;
             newSO.eol        = source.shopItemSO.eol;
             newSO.sprite     = BaseQsfpSprite;
 
             var cloned = Object.Instantiate(source.gameObject, parent.transform, false);
-            cloned.name = $"ShopItem_{def.DisplayName.Replace(" ", "_")}";
+            cloned.name = $"ShopItem_{label.Replace(" ", "_")}";
             cloned.transform.localPosition = Vector3.zero;
             cloned.transform.localScale    = Vector3.one;
 
             var shopItem = cloned.GetComponent<ShopItem>();
             if (shopItem == null)
             {
-                MelonLogger.Error($"[More SFP] ShopItem component missing for '{def.DisplayName}'.");
+                MelonLogger.Error($"[More SFP] ShopItem component missing for '{label}'.");
                 Object.Destroy(cloned);
                 return null;
             }
 
             shopItem.shopItemSO = newSO;
-            shopItem.guid       = def.ShopGuid;
+            shopItem.guid       = guid;
             cloned.SetActive(true);
 
             MelonLogger.Msg($"[More SFP] Shop button added: '{newSO.itemName}' (prefabID={prefabID}, price={newSO.price})");
             return cloned;
+        }
+
+        // -----------------------------------------------------------------------
+        // Expands a live SFPBox from its vanilla capacity (5) to newCapacity (32)
+        // by cloning slot positions and using proper Il2Cpp array types.
+        // Called by DeliveryScannerRoutine after the box has been delivered.
+        // -----------------------------------------------------------------------
+        internal static void UpgradeToBulkBox(SFPBox box, int newCapacity)
+        {
+            var oldPositions = box.sfpPositions;
+            if (oldPositions == null || oldPositions.Length == 0) return;
+
+            int oldCap = oldPositions.Length;
+            if (oldCap >= newCapacity) return;
+
+            var newPositions = new Il2CppReferenceArray<Transform>(newCapacity);
+            var newUsed      = new Il2CppStructArray<int>(newCapacity);
+
+            int fullSlotValue = box.usedPositions != null && box.usedPositions.Length > 0
+                ? box.usedPositions[oldCap - 1] : 1;
+
+            // Copy existing slots.
+            for (int i = 0; i < oldCap; i++)
+            {
+                newPositions[i] = oldPositions[i];
+                newUsed[i] = box.usedPositions != null && i < box.usedPositions.Length
+                    ? box.usedPositions[i] : 0;
+            }
+
+            // Clone new slots from the original positions (round-robin).
+            for (int i = oldCap; i < newCapacity; i++)
+            {
+                int baseIdx = i % oldCap;
+                Transform baseSlot = oldPositions[baseIdx];
+
+                var newSlotObj = Object.Instantiate(baseSlot.gameObject, baseSlot.parent);
+                newSlotObj.name = $"SFPPositionInBox_{i}";
+                newSlotObj.transform.localPosition = baseSlot.localPosition;
+
+                newPositions[i] = newSlotObj.transform;
+                newUsed[i] = fullSlotValue;
+            }
+
+            box.sfpPositions  = newPositions;
+            box.usedPositions = newUsed;
+
+            MelonLogger.Msg($"[More SFP] Upgraded box '{box.gameObject.name}' from {oldCap} → {newCapacity} slots.");
+        }
+
+        // -----------------------------------------------------------------------
+        // Scans the world for newly delivered custom boxes that should be 32x.
+        // Runs in a coroutine, polling every 1.5 s until all pending orders are
+        // fulfilled. Snapshots existing boxes before scanning to avoid upgrading
+        // boxes the player already had in the world.
+        // -----------------------------------------------------------------------
+        internal static IEnumerator DeliveryScannerRoutine()
+        {
+            MelonLogger.Msg("[More SFP] DeliveryScannerRoutine started.");
+            foreach (var kv in PendingBulkOrders)
+                MelonLogger.Msg($"[More SFP]   Pending: prefabID={kv.Key}, count={kv.Value}");
+
+            // Track boxes we've already upgraded so we don't touch them again.
+            var upgradedIds = new HashSet<int>();
+
+            bool hasPending = true;
+            int scanCount = 0;
+            while (hasPending)
+            {
+                yield return new WaitForSeconds(1.5f);
+                scanCount++;
+
+                var allBoxes = Object.FindObjectsOfType<SFPBox>();
+                if (scanCount <= 5 || scanCount % 10 == 0)
+                    MelonLogger.Msg($"[More SFP] Scan #{scanCount}: {allBoxes.Count} boxes in world.");
+
+                foreach (var box in allBoxes)
+                {
+                    if (box == null) continue;
+                    if (upgradedIds.Contains(box.GetInstanceID())) continue;
+                    // Already has more than vanilla 5 slots — skip.
+                    if (box.sfpPositions != null && box.sfpPositions.Length > 5) continue;
+
+                    int boxType = box.sfpBoxType;
+                    if (PendingBulkOrders.ContainsKey(boxType) && PendingBulkOrders[boxType] > 0)
+                    {
+                        MelonLogger.Msg($"[More SFP] Upgrading box '{box.gameObject.name}' " +
+                                        $"(sfpBoxType={boxType}) to 32 slots!");
+                        UpgradeToBulkBox(box, 32);
+                        PendingBulkOrders[boxType]--;
+                        upgradedIds.Add(box.GetInstanceID());
+                    }
+                }
+
+                hasPending = false;
+                foreach (var count in PendingBulkOrders.Values)
+                    if (count > 0) { hasPending = true; break; }
+
+                // Safety: stop after 5 minutes.
+                if (scanCount >= 200)
+                {
+                    MelonLogger.Warning("[More SFP] DeliveryScannerRoutine timed out after 5 min.");
+                    break;
+                }
+            }
+
+            MelonLogger.Msg("[More SFP] DeliveryScannerRoutine finished.");
+            PendingBulkOrders.Clear();
         }
     }
 }

@@ -18,12 +18,17 @@ namespace MoreSFPModules
             /// <summary>prefabID of the vanilla base module used as clone source.</summary>
             internal readonly int BasePrefabID;
 
-            internal Entry(float speedInternal, int moduleSfpType, int boxSfpType, int basePrefabID)
+            /// <summary>Number of modules inside the box (5 = standard, 32 = large box).</summary>
+            internal readonly int ModuleCount;
+
+            internal Entry(float speedInternal, int moduleSfpType, int boxSfpType, int basePrefabID,
+                           int moduleCount = 5)
             {
                 SpeedInternal = speedInternal;
                 ModuleSfpType = moduleSfpType;
                 BoxSfpType    = boxSfpType;
                 BasePrefabID  = basePrefabID;
+                ModuleCount   = moduleCount;
             }
         }
 
