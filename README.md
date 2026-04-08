@@ -2,17 +2,22 @@
 
 Adds higher-speed SFP modules beyond the vanilla game cap of 40 Gbps.
 
-## Currently added
+[![](https://dcbadge.limes.pink/api/server/r3mg4g8Cbg)](https://discord.gg/r3mg4g8Cbg)
 
-| Module | Speed |
-|--------|-------|
+## Added modules
+
+| Module | Speed    |
+|--------|----------|
 | QSFP28 100Gbps | 100 Gbps |
 | QSFP56 200Gbps | 200 Gbps |
+| QSFP-DD 400Gbps | 400 Gbps |
+| QSFP-DD 800Gbps | 800 Gbps |
 
 ## Features
 
 - Buyable from the **computer shop** like any vanilla module
 - Fully compatible with QSFP+ switch ports
+- 32 port boxes available in the shop
 - **Save/load persistent** — modules installed in switch ports survive game restarts
 
 ## Requirements
