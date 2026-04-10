@@ -1,10 +1,10 @@
-# More SFP Modules
+# Faster QSFP Modules
 
-Adds higher-speed SFP modules beyond the vanilla game cap of 40 Gbps.
+This mod adds faster QSFP modules to Data Center.
 
 [![](https://dcbadge.limes.pink/api/server/r3mg4g8Cbg)](https://discord.gg/r3mg4g8Cbg)
 
-## Added modules
+## Available Modules
 
 | Module | Speed    |
 |--------|----------|
@@ -15,9 +15,9 @@ Adds higher-speed SFP modules beyond the vanilla game cap of 40 Gbps.
 
 ## Features
 
-- Buyable from the **computer shop** like any vanilla module
+- Buyable from the **shop** like any vanilla module
 - Fully compatible with QSFP+ switch ports
-- 32 port boxes available in the shop
+- 32 module boxes available in the shop
 - **Save/load persistent** — modules installed in switch ports survive game restarts
 
 ## Requirements
@@ -27,7 +27,7 @@ Adds higher-speed SFP modules beyond the vanilla game cap of 40 Gbps.
 ## Installation
 
 1. Install MelonLoader for Data Center if you haven't already
-2. Drop `more-spf-modules.dll` into your `Data Center/Mods/` folder
+2. Drop `FasterQSFPModules.dll` into your `Data Center/Mods/` folder
 3. Launch the game — the module appears in the shop immediately
 
 ## Notes
