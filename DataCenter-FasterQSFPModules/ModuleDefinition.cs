@@ -70,6 +70,34 @@ namespace MoreSFPModules
                 XpToUnlock      = 0,
                 ShopGuid        = "more_sfp_qsfpdd_800g_v1",
             },
+
+            //Added by Big Texas Jerky to be used with Quantum Servers
+            new ModuleDefinition
+            {
+                DisplayName     = "QSFP-DWDM 1600Gbps",
+                SpeedGbps       = 1600f,
+                PriceMultiplier = 16f,
+                XpToUnlock      = 0,
+                ShopGuid        = "more_sfp_qsfp_dwdm_1600g_v1",
+            },
+
+            new ModuleDefinition
+            {
+                DisplayName     = "QSFP-DWDM 3200Gbps",
+                SpeedGbps       = 3200f,
+                PriceMultiplier = 28f,
+                XpToUnlock      = 0,
+                ShopGuid        = "more_sfp_qsfp_dwdm_3200g_v1",
+            },
+
+            new ModuleDefinition
+            {
+                DisplayName     = "QSFP-DWDM 6400Gbps",
+                SpeedGbps       = 6400f,
+                PriceMultiplier = 48f,
+                XpToUnlock      = 0,
+                ShopGuid        = "more_sfp_qsfp_dwdm_6400g_v1",
+            },
         };
     }
 }
