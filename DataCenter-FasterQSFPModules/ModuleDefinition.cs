@@ -1,3 +1,5 @@
+using UnityEngine;
+
 namespace MoreSFPModules
 {
     
@@ -27,6 +29,9 @@ namespace MoreSFPModules
         /// </summary>
         public string ShopGuid;
 
+        /// <summary>Optional color for the module's box and cable in the game. If not set, it will use the default QSFP+ colors.</summary>
+        public Color ModuleColor;
+        
         // Internal helper — used by Core.cs
         internal float InternalSpeed => SpeedGbps / 5f;
     }
@@ -42,6 +47,7 @@ namespace MoreSFPModules
                 PriceMultiplier = 2.5f,
                 XpToUnlock      = 0,
                 ShopGuid        = "more_sfp_qsfp28_100g_v1",
+                ModuleColor     = new Color(0f,   0.8f, 0.3f, 1f),
             },
             
             new ModuleDefinition
@@ -51,9 +57,9 @@ namespace MoreSFPModules
                 PriceMultiplier = 4.5f,
                 XpToUnlock      = 0,
                 ShopGuid        = "more_sfp_qsfp56_200g_v1",
+                ModuleColor     = new Color(1f,   0.5f, 0f,   1f),
             },
             
-            //Below this is the part i added, its the only part i am responsible for - Default
             new ModuleDefinition
             {
                 DisplayName     = "QSFP-DD 400Gbps",
@@ -61,7 +67,9 @@ namespace MoreSFPModules
                 PriceMultiplier = 6.5f,
                 XpToUnlock      = 0,
                 ShopGuid        = "more_sfp_qsfpdd_400g_v1",
+                ModuleColor     = new Color(1f, 0.75f, 0f, 1f),
             },
+            
             new ModuleDefinition
             {
                 DisplayName     = "QSFP-DD 800Gbps",
@@ -69,6 +77,37 @@ namespace MoreSFPModules
                 PriceMultiplier = 9f,
                 XpToUnlock      = 0,
                 ShopGuid        = "more_sfp_qsfpdd_800g_v1",
+                ModuleColor     = new Color(0.9f, 0.05f, 0.05f, 1f),
+            },
+            
+            new ModuleDefinition
+            {
+                DisplayName     = "QSFP-DWDM 1600Gbps",
+                SpeedGbps       = 1600f,
+                PriceMultiplier = 16f,
+                XpToUnlock      = 0,
+                ShopGuid        = "more_sfp_qsfp_dwdm_1600g_v1",
+                ModuleColor     = new Color(0.6f, 0f, 1f, 1f),
+            },
+
+            new ModuleDefinition
+            {
+                DisplayName     = "QSFP-DWDM 3200Gbps",
+                SpeedGbps       = 3200f,
+                PriceMultiplier = 28f,
+                XpToUnlock      = 0,
+                ShopGuid        = "more_sfp_qsfp_dwdm_3200g_v1",
+                ModuleColor     = new Color(1f, 0f, 0.6f, 1f),
+            },
+            
+            new ModuleDefinition
+            {
+                DisplayName     = "QSFP-DWDM 6400Gbps",
+                SpeedGbps       = 6400f,
+                PriceMultiplier = 48f,
+                XpToUnlock      = 0,
+                ShopGuid        = "more_sfp_qsfp_dwdm_6400g_v1",
+                ModuleColor     = new Color(0f, 0.9f, 0.9f, 1f),
             },
         };
     }

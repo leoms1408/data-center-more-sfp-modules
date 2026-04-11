@@ -5,7 +5,7 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 
-[assembly: MelonInfo(typeof(MoreSFPModules.Core), "More SFP Modules", "1.0.2", "leoms1408")]
+[assembly: MelonInfo(typeof(MoreSFPModules.Core), "More SFP Modules", "1.0.3", "leoms1408")]
 [assembly: MelonGame("Waseku", "Data Center")]
 
 namespace MoreSFPModules
@@ -168,8 +168,52 @@ namespace MoreSFPModules
             var usableObj = clone.GetComponent<UsableObject>();
             if (usableObj != null)
                 usableObj.prefabID = prefabID;
+            
+            ApplyModuleTint(clone, prefabID);
 
             return clone;
+        }
+
+        // -----------------------------------------------------------------------
+        // Walks every Renderer in the module hierarchy, clones any material whose
+        // name contains "Blue", and recolors it to the tint defined per prefabID.
+        // Uses GetComponentsInChildren because the MeshRenderer of the QSFP+ model
+        // lives on a child GameObject, not on the root.
+        // -----------------------------------------------------------------------
+        internal static void ApplyModuleTint(GameObject root, int prefabID)
+        {
+            if (root == null) return;
+
+            // prefabIDs start at MOD_ID_BASE (100) and map 1:1 to ModuleList.All.
+            int defIndex = prefabID - 100;
+            if (defIndex < 0 || defIndex >= ModuleList.All.Length) return;
+            Color tint = ModuleList.All[defIndex].ModuleColor;
+
+            // Common color property names across shaders we might encounter.
+            string[] colorProps = { "_Color", "_BaseColor", "_MainColor", "_TintColor", "_Tint", "_AlbedoColor" };
+
+            var renderers = root.GetComponentsInChildren<Renderer>(true);
+            foreach (var rend in renderers)
+            {
+                if (rend == null) continue;
+                var mats = rend.materials; // returns instanced copies — safe to mutate
+                bool changed = false;
+
+                for (int m = 0; m < mats.Length; m++)
+                {
+                    if (mats[m] == null) continue;
+                    if (!mats[m].name.Contains("Blue")) continue;
+
+                    foreach (var prop in colorProps)
+                    {
+                        if (mats[m].HasProperty(prop))
+                            mats[m].SetColor(prop, tint);
+                    }
+                    changed = true;
+                }
+
+                if (changed) rend.materials = mats;
+            }
         }
 
         // -----------------------------------------------------------------------
@@ -214,7 +258,10 @@ namespace MoreSFPModules
             // register them as independent world items and cause them to spawn loose.
             // PatchCableLinkInsertSFP corrects the prefabID at insertion time instead.
             foreach (var childModule in clone.GetComponentsInChildren<SFPModule>())
+            {
                 childModule.speed = entry.SpeedInternal;
+                ApplyModuleTint(childModule.gameObject, prefabID);
+            }
 
             return clone;
         }
