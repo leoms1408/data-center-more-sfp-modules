@@ -6,18 +6,22 @@ This mod adds faster QSFP modules to Data Center.
 
 ## Available Modules
 
-| Module | Speed    |
-|--------|----------|
-| QSFP28 100Gbps | 100 Gbps |
-| QSFP56 200Gbps | 200 Gbps |
-| QSFP-DD 400Gbps | 400 Gbps |
-| QSFP-DD 800Gbps | 800 Gbps |
+| Module             | Speed      | Color   |
+|--------------------|------------|---------|
+| QSFP28 100Gbps     | 100 Gbps   | Green   |
+| QSFP56 200Gbps     | 200 Gbps   | Orange  |
+| QSFP-DD 400Gbps    | 400 Gbps   | Yellow  |
+| QSFP-DD 800Gbps    | 800 Gbps   | Red     |
+| QSFP-DWDM 1600Gbps | 1600 Gbps  | Purple  |
+| QSFP-DWDM 3200Gbps | 3200 Gbps  | Magenta |
+| QSFP-DWDM 6400Gbps | 6400 Gbps  | Cyan    |
 
 ## Features
 
 - Buyable from the **shop** like any vanilla module
 - Fully compatible with QSFP+ switch ports
 - 32 module boxes available in the shop
+- **Color-coded modules** — each tier gets its own tint so you can tell them apart at a glance
 - **Save/load persistent** — modules installed in switch ports survive game restarts
 
 ## Requirements
@@ -33,4 +37,3 @@ This mod adds faster QSFP modules to Data Center.
 ## Notes
 
 - Modules use the QSFP+ form factor — they fit any port that accepts a vanilla QSFP+ 40Gbps module
-- **The modules currently use the same model as the vanilla QSFP+** — custom models may be added in a future update
