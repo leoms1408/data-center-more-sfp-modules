@@ -16,7 +16,7 @@ namespace MoreSFPModules
     {
         private static void Postfix(MainGameManager __instance)
         {
-            MelonLogger.Msg("[More SFP] MainGameManager.Awake → setting up registry.");
+            MelonLogger.Msg("MainGameManager.Awake → setting up registry.");
             Core.SetupRegistry(__instance);
         }
     }
@@ -36,7 +36,7 @@ namespace MoreSFPModules
 
             if (len > 0 && !ModuleRegistry.Entries.ContainsKey(len - 1))
             {
-                MelonLogger.Warning("[More SFP] sfpPrefabs was RESET — re-extending in Start.");
+                MelonLogger.Warning("sfpPrefabs was RESET — re-extending in Start.");
                 Core.SetupRegistry(__instance);
             }
         }
@@ -52,10 +52,25 @@ namespace MoreSFPModules
     {
         private static bool Prefix(int itemID, PlayerManager.ObjectInHand itemType, ref GameObject __result)
         {
-            if (!ModuleRegistry.TryGet(itemID, out var entry)) return true;
-
             var mgm = MainGameManager.instance;
             if (mgm == null) return true;
+
+            // 32x bulk item: BULK_ID_BASE + i → return a box marked with "_bulk_"
+            // in its name. The actual 32-slot expansion is done post-delivery by
+            // BulkUpgradeScanner (game re-initializes slots after instantiation).
+            if (itemID >= Core.BULK_ID_BASE && itemID < Core.BULK_ID_BASE + ModuleList.All.Length)
+            {
+                int regularID = itemID - Core.BULK_ID_BASE + Core.MOD_ID_BASE;
+                if (ModuleRegistry.TryGet(regularID, out var bulkEntry) && (int)itemType == 9)
+                {
+                    __result = Core.BuildBulkBoxPrefab(mgm, itemID, bulkEntry);
+                    MelonCoroutines.Start(Core.BulkUpgradeScanner());
+                    return false;
+                }
+                return true;
+            }
+
+            if (!ModuleRegistry.TryGet(itemID, out var entry)) return true;
 
             // ObjectInHand.SFPBox == 9, ObjectInHand.SFPModule == 8
             if ((int)itemType == 9)
@@ -132,57 +147,6 @@ namespace MoreSFPModules
                     break;
                 }
             }
-        }
-    }
-
-    // =========================================================================
-    // Patch: ComputerShop.ButtonCheckOut (Prefix)
-    // Scans the cart for 32x bulk items. When found, records pending orders
-    // and starts the delivery scanner that upgrades boxes post-spawn.
-    // =========================================================================
-    [HarmonyPatch(typeof(ComputerShop), nameof(ComputerShop.ButtonCheckOut))]
-    internal static class PatchButtonCheckOut
-    {
-        private static void Prefix(ComputerShop __instance)
-        {
-            MelonLogger.Msg("[More SFP] ButtonCheckOut Prefix fired.");
-
-            if (__instance.cartUIItems == null)
-            {
-                MelonLogger.Warning("[More SFP] cartUIItems is null!");
-                return;
-            }
-
-            MelonLogger.Msg($"[More SFP] Cart has {__instance.cartUIItems.Count} item(s).");
-
-            int totalNew = 0;
-            foreach (var cartItem in __instance.cartUIItems)
-            {
-                if (cartItem == null) continue;
-
-                MelonLogger.Msg($"[More SFP]   Cart item: name='{cartItem.itemName}', " +
-                                $"id={cartItem.itemID}, qty={cartItem.Quantity}");
-
-                for (int i = 0; i < ModuleList.All.Length; i++)
-                {
-                    var def = ModuleList.All[i];
-                    string bulkName = $"32x {def.DisplayName}";
-
-                    if (cartItem.itemName == bulkName)
-                    {
-                        int prefabID = 100 + i;
-                        if (!Core.PendingBulkOrders.ContainsKey(prefabID))
-                            Core.PendingBulkOrders[prefabID] = 0;
-                        Core.PendingBulkOrders[prefabID] += cartItem.Quantity;
-                        totalNew += cartItem.Quantity;
-                        MelonLogger.Msg($"[More SFP] Bulk order matched: {cartItem.Quantity}x '{bulkName}' → prefabID={prefabID}");
-                    }
-                }
-            }
-
-            MelonLogger.Msg($"[More SFP] Total new bulk orders: {totalNew}");
-            if (totalNew > 0)
-                MelonCoroutines.Start(Core.DeliveryScannerRoutine());
         }
     }
 

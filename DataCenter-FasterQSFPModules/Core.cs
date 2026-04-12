@@ -3,9 +3,8 @@ using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using MelonLoader;
 using UnityEngine;
 using System.Collections;
-using System.Collections.Generic;
 
-[assembly: MelonInfo(typeof(MoreSFPModules.Core), "More SFP Modules", "1.0.3", "leoms1408")]
+[assembly: MelonInfo(typeof(MoreSFPModules.Core), "FasterQSFPModules", "1.0.4", "leoms1408")]
 [assembly: MelonGame("Waseku", "Data Center")]
 
 namespace MoreSFPModules
@@ -22,14 +21,17 @@ namespace MoreSFPModules
         // prefabID of the vanilla QSFP+ module — used as clone source in BuildModulePrefab/BuildBoxPrefab.
         internal static int BaseQsfpPrefabID = -1;
 
+        // Item-ID ranges for shop entries.
+        // MOD_ID_BASE: 5x box / bare module (also used as sfpBoxType / prefabID in save data).
+        // BULK_ID_BASE: 32x box shop item — distinct ID so GetPrefabForItem can return a
+        //               pre-expanded box without any post-delivery scanning.
+        internal const int MOD_ID_BASE  = 100;
+        internal const int BULK_ID_BASE = 200;
+
         // Inactive holder for prefab templates — parenting templates here makes their
         // activeInHierarchy = false, so the game's UsableObject tracker ignores them.
         // Object.Instantiate still produces active clones from inactive-hierarchy objects.
         internal static GameObject TemplateHolder { get; private set; }
-
-        // Tracks pending 32x bulk box orders: key = custom prefabID (100+), value = count.
-        // Populated by PatchButtonCheckOut, consumed by DeliveryScannerRoutine.
-        internal static readonly Dictionary<int, int> PendingBulkOrders = new();
 
         // -----------------------------------------------------------------------
         // Scans vanilla sfpPrefabs to find the highest-speed module (QSFP+ 40G),
@@ -49,11 +51,11 @@ namespace MoreSFPModules
             var sfpPrefabs = mgm.sfpPrefabs;
             if (sfpPrefabs == null || sfpPrefabs.Length == 0)
             {
-                MelonLogger.Warning("[More SFP] sfpPrefabs is empty — skipping setup.");
+                MelonLogger.Warning("sfpPrefabs is empty — skipping setup.");
                 return;
             }
 
-            MelonLogger.Msg($"[More SFP] Vanilla SFP prefabs: {sfpPrefabs.Length}");
+            MelonLogger.Msg($"Vanilla SFP prefabs: {sfpPrefabs.Length}");
 
             float highestSpeed = -1f;
 
@@ -77,11 +79,11 @@ namespace MoreSFPModules
 
             if (BaseQsfpPrefabID < 0)
             {
-                MelonLogger.Error("[More SFP] Could not identify base QSFP+ prefab.");
+                MelonLogger.Error("Could not identify base QSFP+ prefab.");
                 return;
             }
 
-            MelonLogger.Msg($"[More SFP] Base QSFP+: prefabID={BaseQsfpPrefabID}, " +
+            MelonLogger.Msg($"Base QSFP+: prefabID={BaseQsfpPrefabID}, " +
                             $"sfpType={BaseQsfpSfpType}, {highestSpeed * 5f} Gbps");
 
             // Create/recreate the inactive holder that hides templates from the world system.
@@ -91,12 +93,11 @@ namespace MoreSFPModules
             TemplateHolder.SetActive(false);
             Object.DontDestroyOnLoad(TemplateHolder);
 
-            const int MOD_ID_BASE = 100;
             int vanillaCount = sfpPrefabs.Length;
 
             if (vanillaCount > MOD_ID_BASE)
             {
-                MelonLogger.Error($"[More SFP] vanilla sfpPrefabs.Length={vanillaCount} exceeds " +
+                MelonLogger.Error($"vanilla sfpPrefabs.Length={vanillaCount} exceeds " +
                                   $"MOD_ID_BASE={MOD_ID_BASE}! prefabID collision risk — mod disabled.");
                 return;
             }
@@ -127,12 +128,12 @@ namespace MoreSFPModules
                     template.name = $"SFPModule_template_{id}";
                 extended[id] = template;
 
-                MelonLogger.Msg($"[More SFP] Registered '{def.DisplayName}': " +
+                MelonLogger.Msg($"Registered '{def.DisplayName}': " +
                                 $"prefabID={id}, {def.SpeedGbps} Gbps");
             }
 
             mgm.sfpPrefabs = extended;
-            MelonLogger.Msg($"[More SFP] sfpPrefabs extended: {vanillaCount} → {extended.Length}");
+            MelonLogger.Msg($"sfpPrefabs extended: {vanillaCount} → {extended.Length}");
         }
 
         // -----------------------------------------------------------------------
@@ -152,7 +153,7 @@ namespace MoreSFPModules
             var basePrefab = mgm.sfpPrefabs[entry.BasePrefabID];
             if (basePrefab == null)
             {
-                MelonLogger.Error($"[More SFP] Base prefab [{entry.BasePrefabID}] is null.");
+                MelonLogger.Error($"Base prefab [{entry.BasePrefabID}] is null.");
                 return null;
             }
 
@@ -238,7 +239,7 @@ namespace MoreSFPModules
 
             if (baseBox == null)
             {
-                MelonLogger.Warning("[More SFP] No base box prefab found.");
+                MelonLogger.Warning("No base box prefab found.");
                 return null;
             }
 
@@ -310,7 +311,7 @@ namespace MoreSFPModules
 
             if (sourceItem == null)
             {
-                LoggerInstance.Warning("[More SFP] No QSFP+ box shop item found — shop buttons skipped.");
+                LoggerInstance.Warning("No QSFP+ box shop item found — shop buttons skipped.");
                 yield break;
             }
 
@@ -323,7 +324,7 @@ namespace MoreSFPModules
             if (modsTransform != null)
                 shopParent = modsTransform.gameObject;
             else
-                LoggerInstance.Warning("[More SFP] 'HL Mods' not found — falling back to shopItemParent.");
+                LoggerInstance.Warning("'HL Mods' not found — falling back to shopItemParent.");
 
             float itemHeight = 0f;
             var sourceRt = sourceItem.GetComponent<UnityEngine.RectTransform>();
@@ -346,11 +347,11 @@ namespace MoreSFPModules
                                               label5, price5, def.XpToUnlock, def.ShopGuid);
                 if (added5 != null) addedCount++;
 
-                // 32x shop button — uses the SAME prefabID as 5x so the game
-                // delivers a normal box; PatchButtonCheckOut upgrades it post-delivery.
+                // 32x shop button — uses BULK_ID_BASE + i so GetPrefabForItem can
+                // distinguish this from the 5x item and return a pre-expanded 32-slot box.
                 string label32 = $"32x {def.DisplayName}";
                 int price32    = (int)(basePrice * def.PriceMultiplier * 32f / 5f);
-                var added32    = AddShopButton(sourceItem, shopParent, prefabID,
+                var added32    = AddShopButton(sourceItem, shopParent, BULK_ID_BASE + i,
                                                label32, price32, def.XpToUnlock,
                                                def.ShopGuid + "_32x");
                 if (added32 != null) addedCount++;
@@ -394,7 +395,7 @@ namespace MoreSFPModules
             var shopItem = cloned.GetComponent<ShopItem>();
             if (shopItem == null)
             {
-                MelonLogger.Error($"[More SFP] ShopItem component missing for '{label}'.");
+                MelonLogger.Error($"ShopItem component missing for '{label}'.");
                 Object.Destroy(cloned);
                 return null;
             }
@@ -403,14 +404,70 @@ namespace MoreSFPModules
             shopItem.guid       = guid;
             cloned.SetActive(true);
 
-            MelonLogger.Msg($"[More SFP] Shop button added: '{newSO.itemName}' (prefabID={prefabID}, price={newSO.price})");
+            MelonLogger.Msg($"Shop button added: '{newSO.itemName}' (prefabID={prefabID}, price={newSO.price})");
             return cloned;
+        }
+
+        // -----------------------------------------------------------------------
+        // Builds a box prefab for the 32x shop item. Identical to a regular custom
+        // box but with "_bulk_" in the name. The actual slot expansion to 32 happens
+        // post-delivery via BulkUpgradeScanner — the game re-initializes sfpPositions
+        // after instantiation, so upgrading at prefab time has no effect.
+        // -----------------------------------------------------------------------
+        internal static GameObject BuildBulkBoxPrefab(MainGameManager mgm, int bulkItemID,
+                                                      ModuleRegistry.Entry entry)
+        {
+            int regularPrefabID = bulkItemID - BULK_ID_BASE + MOD_ID_BASE;
+            var box = BuildBoxPrefab(mgm, regularPrefabID, entry);
+            if (box == null) return null;
+
+            // Mark with distinctive name so the scanner can identify it.
+            box.name = $"SFPBox_bulk_{regularPrefabID}";
+            return box;
+        }
+
+        // -----------------------------------------------------------------------
+        // Coroutine that scans the world for boxes with "_bulk_" in their name
+        // that haven't been expanded to 32 slots yet. Started when a bulk item is
+        // purchased; runs until no more un-upgraded bulk boxes remain.
+        // -----------------------------------------------------------------------
+        private static bool _bulkScannerRunning;
+
+        internal static IEnumerator BulkUpgradeScanner()
+        {
+            if (_bulkScannerRunning) yield break;
+            _bulkScannerRunning = true;
+
+            // Wait for the game to finish spawning and initializing the box.
+            yield return new WaitForSeconds(2f);
+
+            for (int scan = 0; scan < 40; scan++)
+            {
+                bool foundAny = false;
+                var allBoxes = Object.FindObjectsOfType<SFPBox>();
+
+                foreach (var box in allBoxes)
+                {
+                    if (box == null) continue;
+                    if (!box.gameObject.activeInHierarchy) continue;
+                    if (!box.gameObject.name.Contains("(Clone")) continue;
+                    if (box.sfpPositions != null && box.sfpPositions.Length >= 32) continue;
+                    if (!box.gameObject.name.Contains("_bulk_")) continue;
+
+                    UpgradeToBulkBox(box, 32);
+                    foundAny = true;
+                }
+
+                if (!foundAny) break;
+                yield return new WaitForSeconds(1.5f);
+            }
+
+            _bulkScannerRunning = false;
         }
 
         // -----------------------------------------------------------------------
         // Expands a live SFPBox from its vanilla capacity (5) to newCapacity (32)
         // by cloning slot positions and using proper Il2Cpp array types.
-        // Called by DeliveryScannerRoutine after the box has been delivered.
         // -----------------------------------------------------------------------
         internal static void UpgradeToBulkBox(SFPBox box, int newCapacity)
         {
@@ -451,67 +508,8 @@ namespace MoreSFPModules
             box.sfpPositions  = newPositions;
             box.usedPositions = newUsed;
 
-            MelonLogger.Msg($"[More SFP] Upgraded box '{box.gameObject.name}' from {oldCap} → {newCapacity} slots.");
+            MelonLogger.Msg($"Upgraded box '{box.gameObject.name}' from {oldCap} → {newCapacity} slots.");
         }
 
-        // -----------------------------------------------------------------------
-        // Scans the world for newly delivered custom boxes that should be 32x.
-        // Runs in a coroutine, polling every 1.5 s until all pending orders are
-        // fulfilled. Snapshots existing boxes before scanning to avoid upgrading
-        // boxes the player already had in the world.
-        // -----------------------------------------------------------------------
-        internal static IEnumerator DeliveryScannerRoutine()
-        {
-            MelonLogger.Msg("[More SFP] DeliveryScannerRoutine started.");
-            foreach (var kv in PendingBulkOrders)
-                MelonLogger.Msg($"[More SFP]   Pending: prefabID={kv.Key}, count={kv.Value}");
-
-            // Track boxes we've already upgraded so we don't touch them again.
-            var upgradedIds = new HashSet<int>();
-
-            bool hasPending = true;
-            int scanCount = 0;
-            while (hasPending)
-            {
-                yield return new WaitForSeconds(1.5f);
-                scanCount++;
-
-                var allBoxes = Object.FindObjectsOfType<SFPBox>();
-                if (scanCount <= 5 || scanCount % 10 == 0)
-                    MelonLogger.Msg($"[More SFP] Scan #{scanCount}: {allBoxes.Count} boxes in world.");
-
-                foreach (var box in allBoxes)
-                {
-                    if (box == null) continue;
-                    if (upgradedIds.Contains(box.GetInstanceID())) continue;
-                    // Already has more than vanilla 5 slots — skip.
-                    if (box.sfpPositions != null && box.sfpPositions.Length > 5) continue;
-
-                    int boxType = box.sfpBoxType;
-                    if (PendingBulkOrders.ContainsKey(boxType) && PendingBulkOrders[boxType] > 0)
-                    {
-                        MelonLogger.Msg($"[More SFP] Upgrading box '{box.gameObject.name}' " +
-                                        $"(sfpBoxType={boxType}) to 32 slots!");
-                        UpgradeToBulkBox(box, 32);
-                        PendingBulkOrders[boxType]--;
-                        upgradedIds.Add(box.GetInstanceID());
-                    }
-                }
-
-                hasPending = false;
-                foreach (var count in PendingBulkOrders.Values)
-                    if (count > 0) { hasPending = true; break; }
-
-                // Safety: stop after 5 minutes.
-                if (scanCount >= 200)
-                {
-                    MelonLogger.Warning("[More SFP] DeliveryScannerRoutine timed out after 5 min.");
-                    break;
-                }
-            }
-
-            MelonLogger.Msg("[More SFP] DeliveryScannerRoutine finished.");
-            PendingBulkOrders.Clear();
-        }
     }
 }
